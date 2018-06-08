@@ -153,7 +153,6 @@ class Radar {
       if (this.lAngleV < 360) {
         this.lAngleV += 4
       } else {
-        console.log(this.lAngleV)
         this.status = 'searchFinish'
       }
     } else if (this.status === 'searchFinish') {
@@ -176,7 +175,6 @@ class Radar {
   }
 
   run () {
-    console.log(this.status)
     this.drawCircle()
     this.updateCircle()
     if (this.status === 'locked') {
@@ -266,7 +264,6 @@ const enemies = Array.from({ length: 10 })
 
 function clickFunction (e) {
   radar.lockTarget()
-  console.log(radar)
 }
 canvas.addEventListener('click', clickFunction)
 
