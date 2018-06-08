@@ -55,7 +55,11 @@ class Radar {
     this.lAngleV = lAngleV
     this.lColor = lColor
 
-    this.status = ''
+    this.status = 'init'
+
+    this.targets = []
+
+    this.try = 0
   }
 
   drawCircle () {
@@ -118,12 +122,14 @@ class Radar {
   }
 
   lockTarget () {
-    canvas.removeEventListener('mousemove', mouseMoveFunction)
-    this.status = 'locked'
+    if (this.status === 'init') {
+      canvas.removeEventListener('mousemove', mouseMoveFunction)
+      this.status = 'locked'
+    }
   }
 
   updateCircle () {
-    if (this.status === 'locked' || this.status === 'search') {
+    if (this.status !== 'init') {
       if (this.cr < this.cb) {
         this.cr += this.cv
         this.cv += this.ca
@@ -142,21 +148,35 @@ class Radar {
   }
 
   updateLine () {
-    if (this.lr < this.cb) {
-      this.lr += this.cv
-    } else {
-      this.lr = this.cb
-      this.status = 'search'
-    }
     if (this.status === 'search') {
       this.lAngle = Math.PI / 180 * this.lAngleV
       if (this.lAngleV < 360) {
         this.lAngleV += 4
+      } else {
+        console.log(this.lAngleV)
+        this.status = 'searchFinish'
+      }
+    } else if (this.status === 'searchFinish') {
+      this.lAngleV = 0
+      this.status = 'fire'
+      if (this.lr > 0) {
+        this.lr = 0
+      } else {
+        this.lr = 0
+        this.status = 'fire'
+      }
+    } else {
+      if (this.lr < this.cb) {
+        this.lr += this.cv
+      } else {
+        this.lr = this.cb
+        this.status = 'search'
       }
     }
   }
 
   run () {
+    console.log(this.status)
     this.drawCircle()
     this.updateCircle()
     if (this.status === 'locked') {
@@ -165,7 +185,20 @@ class Radar {
     } else if (this.status === 'search') {
       this.rotateLine()
       this.updateLine()
+    } else if (this.status === 'searchFinish') {
+      this.drawLine()
+      this.updateLine()
+      canvas.addEventListener('mousemove', mouseMoveFunction)
+      this.status = 'init'
+      Radar.checkEnemies()
     }
+  }
+
+  static checkEnemies () {
+    const numberOfEnemies = enemies.filter((enemy) => {
+      return enemy.status === 'alive'
+    })
+    h1Span.innerHTML = numberOfEnemies.length
   }
 }
 
@@ -173,12 +206,53 @@ class Enemy {
   constructor (x, y) {
     this.x = x || Math.random() * canvas.width
     this.y = y || Math.random() * canvas.height
+    this.color = 'red'
+
+    this.status = 'alive'
+
+    this.targets = []
+  }
+
+  get distanceToMouse () {
+    const distanceToMouse = Math.sqrt(Math.pow(mousePos.x - this.x, 2) + Math.pow(mousePos.y - this.y, 2))
+    return distanceToMouse
+  }
+
+  get angleToMouse () {
+    const x = this.x - mousePos.x
+    const y = this.y - mousePos.y
+    let angle = Math.atan2(y, x) * 180 / Math.PI
+    if (angle < 0) {
+      angle += 360
+    }
+    return angle
   }
 
   draw () {
     ctx.beginPath()
     ctx.arc(this.x, this.y, 10, 0, Math.PI * 2)
+    ctx.fillStyle = this.color
     ctx.fill()
+  }
+
+  checkDetected () {
+    if (this.distanceToMouse < radar.cb && this.angleToMouse < radar.lAngleV && radar.status !== 'init') {
+      this.status = 'detected'
+    }
+    if (this.status === 'alive') {
+      this.color = 'transparent'
+    } else if (this.status === 'detected') {
+      this.color = 'red'
+    }
+    const fire = enemies.filter((enemy) => {
+      return enemy.status === 'detected'
+    })
+
+    // ctx.beginPath()
+    // ctx.fillText(this.distanceToMouse, this.x + 20, this.y)
+    // ctx.fillText(this.angleToMouse, this.x + 20, this.y + 20)
+    // ctx.fillText(radar.lAngleV, this.x + 20, this.y + 40)
+    // ctx.stroke()
   }
 }
 
@@ -192,6 +266,7 @@ const enemies = Array.from({ length: 10 })
 
 function clickFunction (e) {
   radar.lockTarget()
+  console.log(radar)
 }
 canvas.addEventListener('click', clickFunction)
 
@@ -202,7 +277,12 @@ function init () {
   radar.attachToMouse()
   enemies.forEach((enemy) => {
     enemy.draw()
+    enemy.checkDetected()
   })
 }
 
 init()
+
+const h1Span = document.querySelector('h1 span')
+
+Radar.checkEnemies()
